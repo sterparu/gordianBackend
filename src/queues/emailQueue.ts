@@ -89,13 +89,14 @@ export const emailWorker = new Worker('email-sending', async (job) => {
 
                 if (isPermanentError(err.message)) {
                     console.log(`Auto-blacklisting ${emailAddress} due to permanent error: ${err.message}`);
-                    await supabase.from('blacklist').insert({
+                    const { error } = await supabase.from('blacklist').insert({
                         email: emailAddress,
                         reason: `Auto-Bounced: ${err.message}`
-                    }).catch(e => {
-                        // Ignore duplicate key error, log others
-                        if (e.code !== '23505') console.error('Failed to auto-blacklist:', e);
                     });
+
+                    if (error && error.code !== '23505') {
+                        console.error('Failed to auto-blacklist:', error);
+                    }
                 }
             }
         };
