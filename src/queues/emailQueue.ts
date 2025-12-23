@@ -2,6 +2,8 @@ import { Queue, Worker } from 'bullmq';
 import { EmailService } from '../services/EmailService';
 import IORedis from 'ioredis';
 
+console.log(`Initializing BullMQ with Redis URL: ${!!process.env.REDIS_URL}`);
+
 const connection = process.env.REDIS_URL
     ? new IORedis(process.env.REDIS_URL, { maxRetriesPerRequest: null })
     : new IORedis({
