@@ -87,6 +87,15 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
                     await handleSubscriptionRenewal(invoice);
                 }
                 break;
+            case 'invoice.payment_failed':
+                const failedInvoice = event.data.object as Stripe.Invoice;
+                console.warn(`Payment failed for invoice: ${failedInvoice.id}, User: ${failedInvoice.customer_email}`);
+                // Ideally, notify user via email here
+                break;
+            case 'customer.subscription.deleted':
+                const subscription = event.data.object as Stripe.Subscription;
+                await handleSubscriptionCancellation(subscription);
+                break;
             default:
                 console.log(`Unhandled event type ${event.type}`);
         }
@@ -112,7 +121,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     // For simplicity, we can fetch subscription details or infer from price.
     // Let's assume we map price amount to limits for now, or just give "Pro" status.
     // Better: Fetch Line Items or Subscription to know the plan.
-
     // For MVP: We will assume specific amounts correspond to tiers, OR pass plan in metadata.
     // But metadata on price is better. 
     // Let's just grant a standard specific limit for now or infer.
@@ -177,6 +185,38 @@ async function handleSubscriptionRenewal(invoice: Stripe.Invoice) {
         .eq('id', user.id);
 
     console.log(`Renewed credits for user ${user.id}`);
+}
+
+async function handleSubscriptionCancellation(subscription: Stripe.Subscription) {
+    const customerId = subscription.customer as string;
+    console.log(`Processing cancellation for customer: ${customerId}`);
+
+    // Find user
+    const { data: user, error: userError } = await supabase.from('user_settings')
+        .select('id')
+        .eq('stripe_customer_id', customerId)
+        .single();
+
+    if (userError || !user) {
+        console.error("User not found for cancellation", customerId);
+        return;
+    }
+
+    // Downgrade to Free
+    const { error } = await supabase.from('user_settings')
+        .update({
+            plan_tier: 'free',
+            monthly_limit: 100,
+            remaining_credits: 100, // Reset to free limit
+            subscription_id: null // Clear subscription ID as it's dead
+        })
+        .eq('id', user.id);
+
+    if (error) {
+        console.error("Failed to downgrade user:", error);
+    } else {
+        console.log(`Downgraded user ${user.id} to free plan.`);
+    }
 }
 
 export default router;
