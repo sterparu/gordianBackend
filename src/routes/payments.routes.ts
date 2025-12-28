@@ -2,6 +2,7 @@ import { Router } from 'express';
 import Stripe from 'stripe';
 import { supabase } from '../db/supabase';
 import express from 'express';
+import { requireAuth } from '../middleware/authMiddleware';
 
 const router = Router();
 // Initialize Stripe
@@ -18,7 +19,7 @@ const stripe = new Stripe(stripeKey, {
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 // Checkout Session (Create Payment Link)
-router.post('/checkout', async (req, res) => {
+router.post('/checkout', requireAuth, async (req, res) => {
     try {
         const { priceId, userId, successUrl, cancelUrl } = req.body;
 
@@ -122,14 +123,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     // const sub = await stripe.subscriptions.retrieve(subscriptionId);
 
     // Check amount total (in cents)
-    const amount = session.amount_total; // e.g. 2900 
+    const amount = session.amount_total; // e.g. 500 or 2000
     let tier = 'free';
     let limit = 100;
 
-    if (amount === 2900) {
+    if (amount === 500) { // 5 Euro
         tier = 'pro';
         limit = 10000;
-    } else if (amount === 9900) {
+    } else if (amount === 2000) { // 20 Euro
         tier = 'business';
         limit = 100000;
     }

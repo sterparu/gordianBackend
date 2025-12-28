@@ -6,6 +6,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import emailRoutes from './routes/email.routes';
 import contactRoutes from './routes/contacts.routes';
+import { requireAuth } from './middleware/authMiddleware';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -30,14 +31,14 @@ app.use((req, res, next) => {
     }
 });
 
-app.use('/api/email', emailRoutes);
-app.use('/api/contacts', contactRoutes);
-app.use('/api/templates', templatesRoutes);
-app.use('/api/settings', settingsRoutes);
+app.use('/api/email', requireAuth, emailRoutes);
+app.use('/api/contacts', requireAuth, contactRoutes);
+app.use('/api/templates', requireAuth, templatesRoutes);
+app.use('/api/settings', requireAuth, settingsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/blacklist', blacklistRoutes);
 app.use('/api/payments', paymentsRoutes);
-app.use('/api/upload', uploadRoutes);
+app.use('/api/upload', requireAuth, uploadRoutes);
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));

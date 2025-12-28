@@ -53,8 +53,12 @@ router.post('/attachment', upload.single('file'), async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Upload error:', error);
-        res.status(500).json({ error: error.message });
+        console.error('Upload error details:', error);
+        // Return the specific error message from Supabase/Storage
+        res.status(500).json({
+            error: error.message || 'Internal Server Error',
+            details: error
+        });
     }
 });
 exports.default = router;

@@ -6,26 +6,37 @@ const router = (0, express_1.Router)();
 // Get all contact groups
 router.get('/groups', async (req, res) => {
     try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
         const { data, error } = await supabase_1.supabase
             .from('contact_groups')
             .select('*')
+            .eq('user_id', req.user.id)
             .order('created_at', { ascending: false });
         if (error)
             throw error;
         res.json(data);
     }
     catch (error) {
+        console.error('Error fetching contact groups:', error);
         res.status(500).json({ error: error.message });
     }
 });
 // Create a contact group with contacts
 router.post('/groups', async (req, res) => {
     try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
         const { name, contacts } = req.body; // contacts is array of objects
         // 1. Create Group
         const { data: groupData, error: groupError } = await supabase_1.supabase
             .from('contact_groups')
-            .insert({ name })
+            .insert({
+            name,
+            user_id: req.user.id
+        })
             .select()
             .single();
         if (groupError)
@@ -55,7 +66,20 @@ router.post('/groups', async (req, res) => {
 // Get contacts for a specific group
 router.get('/groups/:groupId/contacts', async (req, res) => {
     try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
         const { groupId } = req.params;
+        // Verify group belongs to user
+        const { data: group, error: groupError } = await supabase_1.supabase
+            .from('contact_groups')
+            .select('id')
+            .eq('id', groupId)
+            .eq('user_id', req.user.id)
+            .single();
+        if (groupError || !group) {
+            return res.status(404).json({ error: 'Group not found or access denied' });
+        }
         const { data, error } = await supabase_1.supabase
             .from('contacts')
             .select('*')
@@ -72,11 +96,15 @@ router.get('/groups/:groupId/contacts', async (req, res) => {
 // Get Single Group
 router.get('/groups/:groupId', async (req, res) => {
     try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
         const { groupId } = req.params;
         const { data, error } = await supabase_1.supabase
             .from('contact_groups')
             .select('*')
             .eq('id', groupId)
+            .eq('user_id', req.user.id)
             .single();
         if (error)
             throw error;
@@ -89,12 +117,16 @@ router.get('/groups/:groupId', async (req, res) => {
 // Update Group Name
 router.put('/groups/:groupId', async (req, res) => {
     try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
         const { groupId } = req.params;
         const { name } = req.body;
         const { data, error } = await supabase_1.supabase
             .from('contact_groups')
             .update({ name })
             .eq('id', groupId)
+            .eq('user_id', req.user.id)
             .select()
             .single();
         if (error)
@@ -108,12 +140,16 @@ router.put('/groups/:groupId', async (req, res) => {
 // Delete Group
 router.delete('/groups/:groupId', async (req, res) => {
     try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
         const { groupId } = req.params;
         // Contacts verify cascade delete in DB, otherwise delete manually here
         const { error } = await supabase_1.supabase
             .from('contact_groups')
             .delete()
-            .eq('id', groupId);
+            .eq('id', groupId)
+            .eq('user_id', req.user.id);
         if (error)
             throw error;
         res.json({ message: 'Group deleted' });
@@ -127,6 +163,13 @@ router.post('/groups/:groupId/contacts', async (req, res) => {
     try {
         const { groupId } = req.params;
         const { email, name } = req.body;
+        // Verify group ownership
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
+        const { error: groupError } = await supabase_1.supabase.from('contact_groups').select('id').eq('id', groupId).eq('user_id', req.user.id).single();
+        if (groupError)
+            return res.status(404).json({ error: 'Group not found' });
         const { data, error } = await supabase_1.supabase
             .from('contacts')
             .insert({
@@ -150,6 +193,18 @@ router.put('/contacts/:contactId', async (req, res) => {
     try {
         const { contactId } = req.params;
         const { email, name } = req.body;
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
+        // Verify ownership via Group
+        // 1. Get contact's group_id
+        const { data: contact, error: fetchError } = await supabase_1.supabase.from('contacts').select('group_id').eq('id', contactId).single();
+        if (fetchError || !contact)
+            return res.status(404).json({ error: 'Contact not found' });
+        // 2. Check if group belongs to user
+        const { data: group, error: groupError } = await supabase_1.supabase.from('contact_groups').select('id').eq('id', contact.group_id).eq('user_id', req.user.id).single();
+        if (groupError || !group)
+            return res.status(403).json({ error: 'Access denied' });
         const { data, error } = await supabase_1.supabase
             .from('contacts')
             .update({ email, name, data: req.body })
@@ -168,6 +223,16 @@ router.put('/contacts/:contactId', async (req, res) => {
 router.delete('/contacts/:contactId', async (req, res) => {
     try {
         const { contactId } = req.params;
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
+        // Verify ownership
+        const { data: contact, error: fetchError } = await supabase_1.supabase.from('contacts').select('group_id').eq('id', contactId).single();
+        if (fetchError || !contact)
+            return res.status(404).json({ error: 'Contact not found' });
+        const { data: group, error: groupError } = await supabase_1.supabase.from('contact_groups').select('id').eq('id', contact.group_id).eq('user_id', req.user.id).single();
+        if (groupError || !group)
+            return res.status(403).json({ error: 'Access denied' });
         const { error } = await supabase_1.supabase
             .from('contacts')
             .delete()

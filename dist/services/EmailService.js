@@ -44,6 +44,7 @@ class EmailService {
     constructor() {
         this.sharedSesClient = null;
         this.sharedSesTransporter = null;
+        this.baseUrl = process.env.BASE_URL || 'http://localhost:4000'; // Default to localhost
         // Initialize Shared SES if env vars are present
         if (process.env.AWS_REGION && process.env.AWS_ACCESS_KEY_ID) {
             this.sharedSesClient = new client_ses_1.SESClient({
@@ -77,6 +78,21 @@ class EmailService {
             filename: att.name,
             path: att.url
         }));
+        // Inject Tracking Pixel & Unsubscribe Link if ID provided
+        let emailHtml = payload.html;
+        if (payload.trackingId) {
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+            const unsubscribeLink = `<br/><br/><p style="text-align:center; color:#9fa6b2; font-size:12px; font-family:sans-serif;">Don't want these emails? <a href="${frontendUrl}/unsubscribe?id=${payload.trackingId}" style="color:#9fa6b2; text-decoration:underline;">Unsubscribe</a></p>`;
+            const trackingPixel = `<img src="${this.baseUrl}/api/analytics/track/${payload.trackingId}" width="1" height="1" style="display:none;" alt="" />`;
+            // Append to body end if exists, else append to end of string
+            const injection = `${unsubscribeLink}${trackingPixel}`;
+            if (emailHtml.includes('</body>')) {
+                emailHtml = emailHtml.replace('</body>', `${injection}</body>`);
+            }
+            else {
+                emailHtml += injection;
+            }
+        }
         if (payload.provider === 'smtp' && payload.smtpConfig) {
             transporter = nodemailer_1.default.createTransport(payload.smtpConfig);
         }
@@ -104,7 +120,7 @@ class EmailService {
             from: payload.from || process.env.DEFAULT_FROM_EMAIL || 'noreply@toolmail.com',
             to: recipientEmail,
             subject: payload.subject,
-            html: payload.html,
+            html: emailHtml, // Use injected HTML
             replyTo: payload.replyTo,
             attachments: nodemailerAttachments.length > 0 ? nodemailerAttachments : undefined
         });

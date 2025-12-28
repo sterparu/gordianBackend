@@ -3,13 +3,16 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const supabase_1 = require("../db/supabase");
 const router = (0, express_1.Router)();
-// Get settings (singleton)
+// Get settings (authenticated user)
 router.get('/', async (req, res) => {
     try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
         const { data, error } = await supabase_1.supabase
             .from('user_settings')
             .select('*')
-            .limit(1)
+            .eq('id', req.user.id)
             .single();
         if (error && error.code !== 'PGRST116') { // PGRST116 is "The result contains 0 rows"
             throw error;
@@ -29,36 +32,24 @@ router.get('/', async (req, res) => {
 // Update settings
 router.put('/', async (req, res) => {
     try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
         const payload = req.body;
-        // Check if row exists
-        const { data: existing } = await supabase_1.supabase
+        // Settings are guaranteed to exist via trigger usually, but strict check is good
+        // Actually, upsert is best here
+        const { data, error } = await supabase_1.supabase
             .from('user_settings')
-            .select('id')
-            .limit(1)
+            .upsert({
+            id: req.user.id,
+            ...payload,
+            updated_at: new Date()
+        })
+            .select()
             .single();
-        let result;
-        if (existing) {
-            const { data, error } = await supabase_1.supabase
-                .from('user_settings')
-                .update({ ...payload, updated_at: new Date() })
-                .eq('id', existing.id)
-                .select()
-                .single();
-            if (error)
-                throw error;
-            result = data;
-        }
-        else {
-            const { data, error } = await supabase_1.supabase
-                .from('user_settings')
-                .insert(payload)
-                .select()
-                .single();
-            if (error)
-                throw error;
-            result = data;
-        }
-        res.json(result);
+        if (error)
+            throw error;
+        res.json(data);
     }
     catch (error) {
         console.error(error);

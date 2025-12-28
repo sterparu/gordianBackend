@@ -8,16 +8,16 @@ const emailService = EmailService.getInstance();
 
 import { supabase } from '../db/supabase';
 
-// Helper to get settings
-const getEmailSettings = async () => {
+// Helper to get settings for a specific user
+const getEmailSettings = async (userId: string) => {
   const { data, error } = await supabase
     .from('user_settings')
     .select('*')
-    .limit(1)
+    .eq('id', userId)
     .single();
 
   if (error || !data) {
-    throw new Error('Email configuration not found. Please configure settings first.');
+    throw new Error('Email configuration not found. Please ensure you are logged in and settings are created.');
   }
   return data;
 };
@@ -73,11 +73,12 @@ const deductCredits = async (userId: string, amount: number) => {
 };
 
 // Helper: Blacklist Filter
-const filterBlacklisted = async (recipients: any[]) => {
-  // 1. Fetch entire blacklist (caching recommended for large scale, but fine for now)
+const filterBlacklisted = async (recipients: any[], userId: string) => {
+  // 1. Fetch user's blacklist
   const { data: blacklist, error } = await supabase
     .from('blacklist')
-    .select('email');
+    .select('email')
+    .eq('user_id', userId);
 
   if (error || !blacklist) return recipients;
 
@@ -99,7 +100,7 @@ router.post('/send', async (req, res) => {
     const initialCount = rawRecipients.length;
 
     // Filter out blacklisted emails
-    const validRecipients = await filterBlacklisted(rawRecipients);
+    const validRecipients = await filterBlacklisted(rawRecipients, req.user.id);
     const blockedCount = initialCount - validRecipients.length;
 
     if (validRecipients.length === 0) {
@@ -109,8 +110,13 @@ router.post('/send', async (req, res) => {
       });
     }
 
-    // 1. Fetch settings from DB
-    let settings = await getEmailSettings();
+    // 0.5 Check User (attached by authMiddleware)
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // 1. Fetch settings from DB for THIS user
+    let settings = await getEmailSettings(req.user.id);
 
     // 2. Renewal Check
     settings = await checkAndRenewBalance(settings);
@@ -141,7 +147,8 @@ router.post('/send', async (req, res) => {
         name: subject,
         subject: subject,
         total_recipients: recipientCount,
-        status: 'processing'
+        status: 'processing',
+        user_id: req.user.id
       })
       .select()
       .single();
@@ -220,7 +227,12 @@ router.post('/send', async (req, res) => {
 router.post('/send-test', async (req, res) => {
   try {
     const { to, subject, html } = req.body;
-    const settings = await getEmailSettings();
+
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const settings = await getEmailSettings(req.user.id);
 
     await emailService.sendEmail({
       to,

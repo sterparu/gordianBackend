@@ -10,22 +10,36 @@ const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const email_routes_1 = __importDefault(require("./routes/email.routes"));
 const contacts_routes_1 = __importDefault(require("./routes/contacts.routes"));
+const authMiddleware_1 = require("./middleware/authMiddleware");
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 4000;
 app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)());
-app.use(express_1.default.json());
-const upload_routes_1 = __importDefault(require("./routes/upload.routes"));
-const path_1 = __importDefault(require("path"));
-// ... (previous imports)
 const templates_routes_1 = __importDefault(require("./routes/templates.routes"));
 const settings_routes_1 = __importDefault(require("./routes/settings.routes"));
+const analytics_routes_1 = __importDefault(require("./routes/analytics.routes"));
+const blacklist_routes_1 = __importDefault(require("./routes/blacklist.routes"));
+const payments_routes_1 = __importDefault(require("./routes/payments.routes"));
+const upload_routes_1 = __importDefault(require("./routes/upload.routes"));
+const path_1 = __importDefault(require("path"));
 // Routes
-app.use('/api/email', email_routes_1.default);
-app.use('/api/contacts', contacts_routes_1.default);
-app.use('/api/templates', templates_routes_1.default);
-app.use('/api/settings', settings_routes_1.default);
-app.use('/api/upload', upload_routes_1.default);
+// Webhook endpoint needs raw body, so we apply json parser conditionally
+app.use((req, res, next) => {
+    if (req.originalUrl === '/api/payments/webhook') {
+        next();
+    }
+    else {
+        express_1.default.json()(req, res, next);
+    }
+});
+app.use('/api/email', authMiddleware_1.requireAuth, email_routes_1.default);
+app.use('/api/contacts', authMiddleware_1.requireAuth, contacts_routes_1.default);
+app.use('/api/templates', authMiddleware_1.requireAuth, templates_routes_1.default);
+app.use('/api/settings', authMiddleware_1.requireAuth, settings_routes_1.default);
+app.use('/api/analytics', analytics_routes_1.default);
+app.use('/api/blacklist', blacklist_routes_1.default);
+app.use('/api/payments', payments_routes_1.default);
+app.use('/api/upload', authMiddleware_1.requireAuth, upload_routes_1.default);
 // Serve uploaded files statically
 app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '../uploads')));
 app.get('/', (req, res) => {

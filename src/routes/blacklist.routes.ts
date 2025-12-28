@@ -1,14 +1,20 @@
 import { Router } from 'express';
 import { supabase } from '../db/supabase';
+import { requireAuth } from '../middleware/authMiddleware';
 
 const router = Router();
 
 // Get all blacklisted emails
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
     try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
+
         const { data, error } = await supabase
             .from('blacklist')
             .select('*')
+            .eq('user_id', req.user.id)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -19,14 +25,22 @@ router.get('/', async (req, res) => {
 });
 
 // Add email to blacklist
-router.post('/', async (req, res) => {
+router.post('/', requireAuth, async (req, res) => {
     try {
         const { email, reason } = req.body;
         if (!email) throw new Error('Email is required');
 
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
+
         const { data, error } = await supabase
             .from('blacklist')
-            .insert({ email, reason })
+            .insert({
+                email,
+                reason,
+                user_id: req.user.id
+            })
             .select()
             .single();
 
@@ -43,13 +57,18 @@ router.post('/', async (req, res) => {
 });
 
 // Remove email from blacklist
-router.delete('/:email', async (req, res) => {
+router.delete('/:email', requireAuth, async (req, res) => {
     try {
         const { email } = req.params;
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
+
         const { error } = await supabase
             .from('blacklist')
             .delete()
-            .eq('email', email);
+            .eq('email', email)
+            .eq('user_id', req.user.id);
 
         if (error) throw error;
         res.json({ message: 'Email removed from blacklist' });

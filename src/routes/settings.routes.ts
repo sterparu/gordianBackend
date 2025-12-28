@@ -3,13 +3,17 @@ import { supabase } from '../db/supabase';
 
 const router = Router();
 
-// Get settings (singleton)
+// Get settings (authenticated user)
 router.get('/', async (req, res) => {
     try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
+
         const { data, error } = await supabase
             .from('user_settings')
             .select('*')
-            .limit(1)
+            .eq('id', req.user.id)
             .single();
 
         if (error && error.code !== 'PGRST116') { // PGRST116 is "The result contains 0 rows"
@@ -32,36 +36,28 @@ router.get('/', async (req, res) => {
 // Update settings
 router.put('/', async (req, res) => {
     try {
-        const payload = req.body;
-
-        // Check if row exists
-        const { data: existing } = await supabase
-            .from('user_settings')
-            .select('id')
-            .limit(1)
-            .single();
-
-        let result;
-        if (existing) {
-            const { data, error } = await supabase
-                .from('user_settings')
-                .update({ ...payload, updated_at: new Date() })
-                .eq('id', existing.id)
-                .select()
-                .single();
-            if (error) throw error;
-            result = data;
-        } else {
-            const { data, error } = await supabase
-                .from('user_settings')
-                .insert(payload)
-                .select()
-                .single();
-            if (error) throw error;
-            result = data;
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
         }
 
-        res.json(result);
+        const payload = req.body;
+
+        // Settings are guaranteed to exist via trigger usually, but strict check is good
+        // Actually, upsert is best here
+        const { data, error } = await supabase
+            .from('user_settings')
+            .upsert({
+                id: req.user.id,
+                ...payload,
+                updated_at: new Date()
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+        res.json(data);
+
+
     } catch (error: any) {
         console.error(error);
         res.status(500).json({ error: error.message });

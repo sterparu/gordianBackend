@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { supabase } from '../db/supabase';
+import { requireAuth } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -47,16 +48,21 @@ router.get('/track/:id', async (req, res) => {
 });
 
 // Get All Campaigns (Summary)
-router.get('/campaigns', async (req, res) => {
+router.get('/campaigns', requireAuth, async (req, res) => {
     try {
         // Fetch campaigns with a raw count of opens?
         // Supabase select count is easier if we do a join or separate queries.
         // For simplicity/performance, let's fetch campaigns and then maybe counts.
         // Or generic SQL view. Let's do a simple fetch for now.
 
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
+
         const { data: campaigns, error } = await supabase
             .from('campaigns')
             .select('*')
+            .eq('user_id', req.user.id)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -99,13 +105,18 @@ router.get('/campaigns', async (req, res) => {
 });
 
 // Get Campaign Details
-router.get('/campaigns/:id', async (req, res) => {
+router.get('/campaigns/:id', requireAuth, async (req, res) => {
     try {
         const { id } = req.params;
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: 'User not authenticated' });
+        }
+
         const { data: campaign, error } = await supabase
             .from('campaigns')
             .select('*')
             .eq('id', id)
+            .eq('user_id', req.user.id)
             .single();
 
         if (error) throw error;
