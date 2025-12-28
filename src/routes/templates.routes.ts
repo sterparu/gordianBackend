@@ -19,6 +19,7 @@ router.get('/', async (req, res) => {
         if (error) throw error;
         res.json(data);
     } catch (error: any) {
+        console.error('Templates API Error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -45,6 +46,7 @@ router.post('/', async (req, res) => {
         if (error) throw error;
         res.json(data);
     } catch (error: any) {
+        console.error('Templates API Error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -70,6 +72,7 @@ router.put('/:id', async (req, res) => {
         if (error) throw error;
         res.json(data);
     } catch (error: any) {
+        console.error('Templates API Error:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -92,6 +95,7 @@ router.delete('/:id', async (req, res) => {
         if (error) throw error;
         res.json({ message: 'Template deleted' });
     } catch (error: any) {
+        console.error('Templates API Error:', error);
         res.status(500).json({ error: error.message });
     }
 });

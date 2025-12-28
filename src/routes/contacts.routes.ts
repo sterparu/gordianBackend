@@ -19,7 +19,7 @@ router.get('/groups', async (req, res) => {
         if (error) throw error;
         res.json(data);
     } catch (error: any) {
-        console.error('Error fetching contact groups:', error);
+        console.error('Contacts API Error (Get Groups):', error);
         res.status(500).json({ error: error.message });
     }
 });

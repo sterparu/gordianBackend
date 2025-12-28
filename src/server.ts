@@ -47,6 +47,15 @@ app.get('/', (req, res) => {
     res.send('ToolMail Backend Running');
 });
 
+// Global Error Handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('Unhandled Server Error:', err);
+    if (!res.headersSent) {
+        res.status(500).json({ error: 'Internal Server Error', details: err.message });
+    }
+});
+
+
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
