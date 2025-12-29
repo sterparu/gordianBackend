@@ -124,6 +124,10 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
                 console.warn(`Payment failed for invoice: ${failedInvoice.id}, User: ${failedInvoice.customer_email}`);
                 // Ideally, notify user via email here
                 break;
+            case 'customer.subscription.updated':
+                const updatedSubscription = event.data.object as Stripe.Subscription;
+                await handleSubscriptionUpdated(updatedSubscription);
+                break;
             case 'customer.subscription.deleted':
                 const subscription = event.data.object as Stripe.Subscription;
                 await handleSubscriptionCancellation(subscription);
@@ -248,6 +252,53 @@ async function handleSubscriptionCancellation(subscription: Stripe.Subscription)
         console.error("Failed to downgrade user:", error);
     } else {
         console.log(`Downgraded user ${user.id} to free plan.`);
+    }
+}
+
+async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+    const customerId = subscription.customer as string;
+    console.log(`Processing subscription update for customer: ${customerId}`);
+
+    // Find user
+    const { data: user, error: userError } = await supabase.from('user_settings')
+        .select('id')
+        .eq('stripe_customer_id', customerId)
+        .single();
+
+    if (userError || !user) {
+        console.error("User not found for subscription update", customerId);
+        return;
+    }
+
+    // Determine new plan
+    const priceAmount = subscription.items.data[0]?.price.unit_amount;
+    let tier = 'free';
+    let limit = 100;
+
+    if (priceAmount === 500) { // 5 Euro
+        tier = 'pro';
+        limit = 10000;
+    } else if (priceAmount === 2000) { // 20 Euro
+        tier = 'business';
+        limit = 100000;
+    }
+
+    // Update DB
+    const { error } = await supabase.from('user_settings')
+        .update({
+            plan_tier: tier,
+            monthly_limit: limit,
+            // optional: remaining_credits could be reset or prorated. 
+            // For now, let's reset to full limit to avoid confusion on upgrade.
+            remaining_credits: limit,
+            subscription_id: subscription.id
+        })
+        .eq('id', user.id);
+
+    if (error) {
+        console.error("Failed to update user plan:", error);
+    } else {
+        console.log(`Updated user ${user.id} to ${tier} plan.`);
     }
 }
 
