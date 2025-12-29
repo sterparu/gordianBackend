@@ -111,7 +111,9 @@ export const emailWorker = new Worker('email-sending', async (job) => {
                     console.log(`Auto-blacklisting ${emailAddress} due to permanent error: ${err.message}`);
                     const { error } = await supabase.from('blacklist').insert({
                         email: emailAddress,
-                        reason: `Auto-Bounced: ${err.message}`
+                        reason: `Auto-Bounced: ${err.message}`,
+                        user_id: campaignId ? (await supabase.from('campaigns').select('user_id').eq('id', campaignId).single()).data?.user_id : undefined,
+                        source: 'bounce'
                     });
 
                     if (error && error.code !== '23505') {

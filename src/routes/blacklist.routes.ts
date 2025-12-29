@@ -64,6 +64,18 @@ router.delete('/:email', requireAuth, async (req, res) => {
             return res.status(401).json({ error: 'User not authenticated' });
         }
 
+        // Check if item exists and is system-managed
+        const { data: item } = await supabase
+            .from('blacklist')
+            .select('source')
+            .eq('email', email)
+            .eq('user_id', req.user.id)
+            .single();
+
+        if (item && (item.source === 'unsubscribe' || item.source === 'bounce')) {
+            return res.status(403).json({ error: 'Cannot remove system-blacklisted emails (Unsubscribed or Bounced).' });
+        }
+
         const { error } = await supabase
             .from('blacklist')
             .delete()
@@ -116,7 +128,8 @@ router.post('/unsubscribe', async (req, res) => {
             .insert({
                 email: log.recipient_email,
                 reason: 'User Unsubscribed',
-                user_id: userId
+                user_id: userId,
+                source: 'unsubscribe'
             });
 
         // Ignore duplicate (already unsubscribed)
