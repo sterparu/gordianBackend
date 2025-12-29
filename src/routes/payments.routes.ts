@@ -50,6 +50,38 @@ router.post('/checkout', requireAuth, async (req, res) => {
     }
 });
 
+// Create Customer Portal Session
+router.post('/portal', requireAuth, async (req, res) => {
+    try {
+        const { userId } = req.body;
+
+        if (!userId) {
+            return res.status(400).json({ error: 'Missing userId' });
+        }
+
+        // 1. Get stripe_customer_id from DB
+        const { data: user, error } = await supabase.from('user_settings')
+            .select('stripe_customer_id')
+            .eq('id', userId)
+            .single();
+
+        if (error || !user?.stripe_customer_id) {
+            return res.status(404).json({ error: 'No Stripe customer found for this user.' });
+        }
+
+        // 2. Create Portal Session
+        const session = await stripe.billingPortal.sessions.create({
+            customer: user.stripe_customer_id,
+            return_url: req.body.returnUrl || 'http://localhost:5173/billing', // Default to billing page
+        });
+
+        res.json({ url: session.url });
+    } catch (error: any) {
+        console.error('Stripe Portal Error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Webhook Handler
 // Note: This route expects RAW body. Middleware in server.ts must skip JSON parsing for this path.
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
