@@ -184,10 +184,12 @@ router.post('/send', async (req, res) => {
       // Standardize input
       const email = typeof r === 'string' ? r : r.email;
       const attachments = typeof r === 'string' ? [] : (r.attachments || []);
+      const rowData = typeof r === 'string' ? {} : (r.data || {});
 
       return {
         email,
         attachments,
+        data: rowData,
         trackingId: crypto.randomUUID() // Generate unique ID of tracking pixel
       };
     });

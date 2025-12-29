@@ -83,21 +83,40 @@ router.post('/unsubscribe', async (req, res) => {
         const { trackingId } = req.body;
         if (!trackingId) throw new Error('Tracking ID is required');
 
-        // 1. Find email from email_logs
+        // 1. Find email from email_logs AND associated User (via Campaign)
         const { data: log, error: logError } = await supabase
             .from('email_logs')
-            .select('recipient_email')
+            .select(`
+                recipient_email,
+                campaigns (
+                    user_id
+                )
+            `)
             .eq('tracking_id', trackingId)
             .single();
 
         if (logError || !log) throw new Error('Invalid unsubscribe link');
 
-        // 2. Add to blacklist
+        // Extract user_id from the joined campaign
+        // Supabase returns an array or object depending on relation one-to-one/many
+        // campaign_id is FK, so it should be a single object
+        const campaign = Array.isArray(log.campaigns) ? log.campaigns[0] : log.campaigns;
+        const userId = campaign?.user_id;
+
+        if (!userId) {
+            console.error('Unsubscribe loop: Could not find user_id for trackingId', trackingId);
+            // Fallback: If no user found, we can't blacklist for a specific user. 
+            // Maybe just log it or fail? 
+            throw new Error('Could not identify user account for this email.');
+        }
+
+        // 2. Add to blacklist with CORRECT user_id
         const { error: blacklistError } = await supabase
             .from('blacklist')
             .insert({
                 email: log.recipient_email,
-                reason: 'User Unsubscribed'
+                reason: 'User Unsubscribed',
+                user_id: userId
             });
 
         // Ignore duplicate (already unsubscribed)

@@ -63,10 +63,28 @@ export const emailWorker = new Worker('email-sending', async (job) => {
             const trackingId = typeof recipient === 'object' ? recipient.trackingId : undefined;
 
             try {
+                // Perform Variable Substitution
+                let personalizedHtml = html;
+                const rowData = typeof recipient === 'object' ? recipient.data : null;
+
+                if (rowData) {
+                    // Escape Regex Helper
+                    const escapeRegExp = (string: string) => {
+                        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    };
+
+                    Object.keys(rowData).forEach(key => {
+                        // We match {{key}}
+                        const safeKey = escapeRegExp(key);
+                        const value = rowData[key] || '';
+                        personalizedHtml = personalizedHtml.replace(new RegExp(`{{${safeKey}}}`, 'g'), String(value));
+                    });
+                }
+
                 await emailService.sendEmail({
                     to: recipient,
                     subject,
-                    html,
+                    html: personalizedHtml,
                     trackingId, // Explicitly pass trackingId 
                     ...config
                 });
