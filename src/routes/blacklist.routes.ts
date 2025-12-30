@@ -117,7 +117,8 @@ router.post('/unsubscribe', async (req, res) => {
 
         if (logError || !log) {
             console.error('Unsubscribe Error - Log lookup failed:', logError, 'Tracking ID:', trackingId);
-            throw new Error('Invalid unsubscribe link');
+            const detail = logError ? logError.message : 'Log not found';
+            throw new Error(`Invalid unsubscribe link: ${detail}`);
         }
 
         // Extract user_id from the joined campaign
