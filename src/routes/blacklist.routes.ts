@@ -95,6 +95,11 @@ router.post('/unsubscribe', async (req, res) => {
         const { trackingId } = req.body;
         if (!trackingId) throw new Error('Tracking ID is required');
 
+        // Handle Test Emails gracefully
+        if (trackingId === 'test-email-no-tracking') {
+            return res.json({ message: 'This is a test email. Unsubscribe functionality is simulated.', email: 'test@example.com' });
+        }
+
         // 1. Find email from email_logs AND associated User (via Campaign)
         // Use ADMIN client because this is a public endpoint accessing protected tables
         const { supabaseAdmin } = await import('../db/supabaseAdmin');
