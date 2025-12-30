@@ -96,7 +96,10 @@ router.post('/unsubscribe', async (req, res) => {
         if (!trackingId) throw new Error('Tracking ID is required');
 
         // 1. Find email from email_logs AND associated User (via Campaign)
-        const { data: log, error: logError } = await supabase
+        // Use ADMIN client because this is a public endpoint accessing protected tables
+        const { supabaseAdmin } = await import('../db/supabaseAdmin');
+
+        const { data: log, error: logError } = await supabaseAdmin
             .from('email_logs')
             .select(`
                 recipient_email,
@@ -110,20 +113,16 @@ router.post('/unsubscribe', async (req, res) => {
         if (logError || !log) throw new Error('Invalid unsubscribe link');
 
         // Extract user_id from the joined campaign
-        // Supabase returns an array or object depending on relation one-to-one/many
-        // campaign_id is FK, so it should be a single object
         const campaign = Array.isArray(log.campaigns) ? log.campaigns[0] : log.campaigns;
         const userId = campaign?.user_id;
 
         if (!userId) {
             console.error('Unsubscribe loop: Could not find user_id for trackingId', trackingId);
-            // Fallback: If no user found, we can't blacklist for a specific user. 
-            // Maybe just log it or fail? 
             throw new Error('Could not identify user account for this email.');
         }
 
         // 2. Add to blacklist with CORRECT user_id
-        const { error: blacklistError } = await supabase
+        const { error: blacklistError } = await supabaseAdmin
             .from('blacklist')
             .insert({
                 email: log.recipient_email,
@@ -147,8 +146,10 @@ router.post('/resubscribe', async (req, res) => {
         const { trackingId } = req.body;
         if (!trackingId) throw new Error('Tracking ID is required');
 
+        const { supabaseAdmin } = await import('../db/supabaseAdmin');
+
         // 1. Find email
-        const { data: log, error: logError } = await supabase
+        const { data: log, error: logError } = await supabaseAdmin
             .from('email_logs')
             .select('recipient_email')
             .eq('tracking_id', trackingId)
@@ -157,7 +158,7 @@ router.post('/resubscribe', async (req, res) => {
         if (logError || !log) throw new Error('Invalid link');
 
         // 2. Remove from blacklist
-        const { error: deleteError } = await supabase
+        const { error: deleteError } = await supabaseAdmin
             .from('blacklist')
             .delete()
             .eq('email', log.recipient_email);
