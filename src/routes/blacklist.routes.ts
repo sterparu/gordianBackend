@@ -146,6 +146,19 @@ router.post('/unsubscribe', async (req, res) => {
             throw blacklistError;
         }
 
+        // 3. STRICT VERIFICATION
+        const { data: verification, error: verifyError } = await supabaseAdmin
+            .from('blacklist')
+            .select('id')
+            .eq('email', log.recipient_email)
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (verifyError || !verification) {
+            console.error('Unsubscribe Verification Failed:', verifyError || 'Row not found after insert');
+            throw new Error('Unsubscribe failed: Database verification could not confirm blacklist status. Please try again.');
+        }
+
         res.json({ message: 'Unsubscribed successfully', email: log.recipient_email });
     } catch (error: any) {
         console.error('Unsubscribe Catch Error:', error);
