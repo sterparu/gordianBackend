@@ -11,9 +11,10 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 // Admin client with Service Role Key (Bypasses RLS)
+// We trim() the key to remove any accidental newlines copying from dashboard/env
 export const supabaseAdmin = createClient(
     supabaseUrl || 'https://placeholder.supabase.co',
-    supabaseServiceKey || 'placeholder',
+    (supabaseServiceKey || 'placeholder').trim(),
     {
         auth: {
             autoRefreshToken: false,
