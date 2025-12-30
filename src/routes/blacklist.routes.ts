@@ -110,14 +110,17 @@ router.post('/unsubscribe', async (req, res) => {
             .eq('tracking_id', trackingId)
             .single();
 
-        if (logError || !log) throw new Error('Invalid unsubscribe link');
+        if (logError || !log) {
+            console.error('Unsubscribe Error - Log lookup failed:', logError, 'Tracking ID:', trackingId);
+            throw new Error('Invalid unsubscribe link');
+        }
 
         // Extract user_id from the joined campaign
         const campaign = Array.isArray(log.campaigns) ? log.campaigns[0] : log.campaigns;
         const userId = campaign?.user_id;
 
         if (!userId) {
-            console.error('Unsubscribe loop: Could not find user_id for trackingId', trackingId);
+            console.error('Unsubscribe loop: Could not find user_id for trackingId', trackingId, 'Log Data:', log);
             throw new Error('Could not identify user account for this email.');
         }
 
@@ -132,10 +135,14 @@ router.post('/unsubscribe', async (req, res) => {
             });
 
         // Ignore duplicate (already unsubscribed)
-        if (blacklistError && blacklistError.code !== '23505') throw blacklistError;
+        if (blacklistError && blacklistError.code !== '23505') {
+            console.error('Unsubscribe Error - Blacklist insert failed:', blacklistError);
+            throw blacklistError;
+        }
 
         res.json({ message: 'Unsubscribed successfully', email: log.recipient_email });
     } catch (error: any) {
+        console.error('Unsubscribe Catch Error:', error);
         res.status(400).json({ error: error.message });
     }
 });
