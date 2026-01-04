@@ -130,9 +130,9 @@ export class EmailService {
                 ...payload.smtpConfig,
                 port: Number(payload.smtpConfig.port), // Ensure port is number
                 // Add timeouts to prevent hanging indefinitely (default is very long)
-                connectionTimeout: 10000, // 10 seconds
-                greetingTimeout: 10000,   // 10 seconds
-                socketTimeout: 20000,     // 20 seconds
+                connectionTimeout: 30000, // 30 seconds
+                greetingTimeout: 30000,   // 30 seconds
+                socketTimeout: 30000,     // 30 seconds
                 // Improve compatibility with older/self-signed servers
                 tls: {
                     rejectUnauthorized: false
@@ -256,9 +256,12 @@ ${emailHtml}
                 user: config.user,
                 pass: config.pass,
             },
-            connectionTimeout: 10000,
-            greetingTimeout: 10000,
-            socketTimeout: 20000
+            connectionTimeout: 30000,
+            greetingTimeout: 30000,
+            socketTimeout: 30000,
+            tls: {
+                rejectUnauthorized: false
+            }
         });
 
         try {
