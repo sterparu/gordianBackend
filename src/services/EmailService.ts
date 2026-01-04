@@ -133,6 +133,10 @@ export class EmailService {
                 connectionTimeout: 30000, // 30 seconds
                 greetingTimeout: 30000,   // 30 seconds
                 socketTimeout: 30000,     // 30 seconds
+
+                // Force IPv4 to avoid IPv6 timeouts (common with Gmail)
+                family: 4,
+
                 // Improve compatibility with older/self-signed servers
                 tls: {
                     rejectUnauthorized: false
@@ -259,6 +263,7 @@ ${emailHtml}
             connectionTimeout: 30000,
             greetingTimeout: 30000,
             socketTimeout: 30000,
+            family: 4, // Force IPv4
             tls: {
                 rejectUnauthorized: false
             }
