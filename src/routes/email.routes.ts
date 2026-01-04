@@ -93,7 +93,7 @@ const filterBlacklisted = async (recipients: any[], userId: string) => {
 
 router.post('/send', async (req, res) => {
   try {
-    const { to, subject, html, type } = req.body;
+    const { to, subject, html, type, language } = req.body;
 
     // 0. Pre-process Recipients & Check Blacklist
     let rawRecipients = Array.isArray(to) ? to : [to];
@@ -212,6 +212,7 @@ router.post('/send', async (req, res) => {
       subject,
       html,
       campaignId,
+      language: language || settings.language || 'ro', // Prefer payload, then DB, then default
       ...emailConfig
     });
 
@@ -229,7 +230,7 @@ router.post('/send', async (req, res) => {
 
 router.post('/send-test', async (req, res) => {
   try {
-    const { to, subject, html } = req.body;
+    const { to, subject, html, language } = req.body;
 
     if (!req.user || !req.user.id) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -242,6 +243,7 @@ router.post('/send-test', async (req, res) => {
       subject,
       html,
       trackingId: 'test-email-no-tracking', // Dummy ID to trigger footer injection
+      language: language || settings.language || 'ro',
       provider: settings.provider,
       from: `${settings.from_name} <${settings.from_email}>`,
       replyTo: settings.reply_to_email,
