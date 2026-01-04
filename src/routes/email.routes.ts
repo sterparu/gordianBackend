@@ -93,7 +93,7 @@ const filterBlacklisted = async (recipients: any[], userId: string) => {
 
 router.post('/send', async (req, res) => {
   try {
-    const { to, subject, html, type } = req.body;
+    const { to, subject, html, type, language } = req.body;
 
     // 0. Pre-process Recipients & Check Blacklist
     let rawRecipients = Array.isArray(to) ? to : [to];
@@ -146,6 +146,7 @@ router.post('/send', async (req, res) => {
       .insert({
         name: subject,
         subject: subject,
+        body: html, // Save email content for analytics
         total_recipients: recipientCount,
         status: 'processing',
         user_id: req.user.id
@@ -211,6 +212,7 @@ router.post('/send', async (req, res) => {
       subject,
       html,
       campaignId,
+      language: language || settings.language || 'ro', // Prefer payload, then DB, then default
       ...emailConfig
     });
 
@@ -228,7 +230,7 @@ router.post('/send', async (req, res) => {
 
 router.post('/send-test', async (req, res) => {
   try {
-    const { to, subject, html } = req.body;
+    const { to, subject, html, language } = req.body;
 
     if (!req.user || !req.user.id) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -241,6 +243,7 @@ router.post('/send-test', async (req, res) => {
       subject,
       html,
       trackingId: 'test-email-no-tracking', // Dummy ID to trigger footer injection
+      language: language || settings.language || 'ro',
       provider: settings.provider,
       from: `${settings.from_name} <${settings.from_email}>`,
       replyTo: settings.reply_to_email,
@@ -276,6 +279,33 @@ router.post('/verify-identity', async (req, res) => {
   } catch (error: any) {
     console.error('Error verifying identity:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/test-smtp', async (req, res) => {
+  try {
+    const config = req.body;
+
+    // Validate required fields
+    if (!config.host || !config.port || !config.user || !config.pass) {
+      return res.status(400).json({ error: 'Missing SMTP configuration fields' });
+    }
+
+    const isValid = await emailService.verifySMTP({
+      host: config.host,
+      port: Number(config.port),
+      user: config.user,
+      pass: config.pass
+    });
+
+    if (isValid) {
+      res.json({ message: 'SMTP Connection Successful' });
+    } else {
+      res.status(400).json({ error: 'Failed to verify SMTP connection' });
+    }
+  } catch (error: any) {
+    console.error('SMTP Test Error:', error);
+    res.status(400).json({ error: error.message || 'SMTP Connection Failed' });
   }
 });
 

@@ -42,8 +42,34 @@ router.put('/', async (req, res) => {
 
         const payload = req.body;
 
+
         // Settings are guaranteed to exist via trigger usually, but strict check is good
-        // Actually, upsert is best here
+        // Unique Alias Check for shared-ses
+        if (payload.provider === 'shared-ses' && payload.from_email) {
+            // 1. Enforce Domain
+            if (!payload.from_email.endsWith('@vasteris.com')) {
+                return res.status(400).json({ error: 'System Default provider requires a @vasteris.com email alias.' });
+            }
+
+            // 2. Reserved Names Check
+            const alias = payload.from_email.split('@')[0].toLowerCase();
+            const reserved = ['notification', 'admin', 'support', 'info', 'marketing', 'sales', 'billing'];
+            if (reserved.includes(alias)) {
+                return res.status(400).json({ error: `The alias '${alias}' is reserved. Please choose a company-specific name.` });
+            }
+
+            // 3. Uniqueness Check in DB
+            const { count } = await supabase
+                .from('user_settings')
+                .select('id', { count: 'exact', head: true })
+                .eq('from_email', payload.from_email)
+                .neq('id', req.user.id); // Don't count self
+
+            if (count && count > 0) {
+                return res.status(409).json({ error: `The address '${payload.from_email}' is already taken. Please choose another.` });
+            }
+        }
+
         const { data, error } = await supabase
             .from('user_settings')
             .upsert({
