@@ -79,7 +79,7 @@ export const emailWorker = new Worker('email-sending', async (job) => {
                         });
 
                         // Replace {{ Variable }} patterns
-                        personalizedHtml = personalizedHtml.replace(/\{\{([^{}]+)\}\}/g, (match, content) => {
+                        personalizedHtml = personalizedHtml.replace(/\{\{([^{}]+)\}\}/g, (match: string, content: string) => {
                             const key = content.trim();
                             // 1. Try exact match
                             if (lookup.has(key)) return String(lookup.get(key));
