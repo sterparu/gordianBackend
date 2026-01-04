@@ -270,6 +270,8 @@ ${emailHtml}
             greetingTimeout: 30000,
             socketTimeout: 30000,
             family: 4, // Force IPv4
+            logger: true, // Log to console
+            debug: true,  // Include debug info
             tls: {
                 rejectUnauthorized: false
             }
