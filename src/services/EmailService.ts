@@ -127,17 +127,21 @@ export class EmailService {
 
         if (payload.provider === 'smtp' && payload.smtpConfig) {
             transporter = nodemailer.createTransport({
-                ...payload.smtpConfig,
-                port: Number(payload.smtpConfig.port), // Ensure port is number
-                // Add timeouts to prevent hanging indefinitely (default is very long)
-                connectionTimeout: 30000, // 30 seconds
-                greetingTimeout: 30000,   // 30 seconds
-                socketTimeout: 30000,     // 30 seconds
+                host: payload.smtpConfig.host,
+                port: Number(payload.smtpConfig.port),
+                secure: Number(payload.smtpConfig.port) === 465,
+                auth: {
+                    user: payload.smtpConfig.auth.user,
+                    pass: payload.smtpConfig.auth.pass
+                },
+                // Timeouts
+                connectionTimeout: 30000,
+                greetingTimeout: 30000,
+                socketTimeout: 30000,
 
-                // Force IPv4 to avoid IPv6 timeouts (common with Gmail)
+                // Force IPv4 to avoid IPv6 timeouts
                 family: 4,
 
-                // Improve compatibility with older/self-signed servers
                 tls: {
                     rejectUnauthorized: false
                 }
@@ -252,13 +256,12 @@ ${emailHtml}
     }
 
     public async verifySMTP(config: any): Promise<boolean> {
-        const isGmail = config.host === 'smtp.gmail.com';
+        console.log(`Verifying SMTP: ${config.host}:${config.port} (User: ${config.user})`);
 
         const transporter = nodemailer.createTransport({
-            service: isGmail ? 'Gmail' : undefined,
-            host: isGmail ? undefined : config.host,
-            port: isGmail ? undefined : config.port,
-            secure: isGmail ? undefined : (config.port === 465),
+            host: config.host,
+            port: Number(config.port),
+            secure: Number(config.port) === 465,
             auth: {
                 user: config.user,
                 pass: config.pass,
@@ -266,6 +269,7 @@ ${emailHtml}
             connectionTimeout: 30000,
             greetingTimeout: 30000,
             socketTimeout: 30000,
+            family: 4, // Force IPv4
             tls: {
                 rejectUnauthorized: false
             }
