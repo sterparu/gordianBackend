@@ -146,6 +146,7 @@ router.post('/send', async (req, res) => {
       .insert({
         name: subject,
         subject: subject,
+        body: html, // Save email content for analytics
         total_recipients: recipientCount,
         status: 'processing',
         user_id: req.user.id
