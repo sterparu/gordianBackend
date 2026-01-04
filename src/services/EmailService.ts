@@ -252,10 +252,13 @@ ${emailHtml}
     }
 
     public async verifySMTP(config: any): Promise<boolean> {
+        const isGmail = config.host === 'smtp.gmail.com';
+
         const transporter = nodemailer.createTransport({
-            host: config.host,
-            port: config.port,
-            secure: config.port === 465,
+            service: isGmail ? 'Gmail' : undefined,
+            host: isGmail ? undefined : config.host,
+            port: isGmail ? undefined : config.port,
+            secure: isGmail ? undefined : (config.port === 465),
             auth: {
                 user: config.user,
                 pass: config.pass,
@@ -263,7 +266,6 @@ ${emailHtml}
             connectionTimeout: 30000,
             greetingTimeout: 30000,
             socketTimeout: 30000,
-            family: 4, // Force IPv4
             tls: {
                 rejectUnauthorized: false
             }
