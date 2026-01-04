@@ -141,7 +141,7 @@ export class EmailService {
                 tls: {
                     rejectUnauthorized: false
                 }
-            });
+            } as any);
         } else if (payload.provider === 'custom-ses' && payload.sesConfig) {
             const ses = new SESClient({
                 apiVersion: '2010-12-01',
@@ -267,7 +267,7 @@ ${emailHtml}
             tls: {
                 rejectUnauthorized: false
             }
-        });
+        } as any);
 
         try {
             await transporter.verify();
