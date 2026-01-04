@@ -68,17 +68,30 @@ export const emailWorker = new Worker('email-sending', async (job) => {
                 const rowData = typeof recipient === 'object' ? recipient.data : null;
 
                 if (rowData) {
-                    // Escape Regex Helper
-                    const escapeRegExp = (string: string) => {
-                        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    };
+                    if (rowData) {
+                        // Create a normalized lookup map for case-insensitive matching if needed, 
+                        // but for now, let's just do robust trimming.
+                        // Actually, let's allow case-insensitive matching to be helpful.
+                        const lookup = new Map();
+                        Object.keys(rowData).forEach(k => {
+                            lookup.set(k.trim(), rowData[k]); // Exact trim match
+                            lookup.set(k.trim().toLowerCase(), rowData[k]); // Fallback case-insensitive
+                        });
 
-                    Object.keys(rowData).forEach(key => {
-                        // We match {{key}}
-                        const safeKey = escapeRegExp(key);
-                        const value = rowData[key] || '';
-                        personalizedHtml = personalizedHtml.replace(new RegExp(`{{${safeKey}}}`, 'g'), String(value));
-                    });
+                        // Replace {{ Variable }} patterns
+                        personalizedHtml = personalizedHtml.replace(/\{\{([^{}]+)\}\}/g, (match, content) => {
+                            const key = content.trim();
+                            // 1. Try exact match
+                            if (lookup.has(key)) return String(lookup.get(key));
+                            // 2. Try case-insensitive
+                            const lowerKey = key.toLowerCase();
+                            if (lookup.has(lowerKey)) return String(lookup.get(lowerKey));
+
+                            // 3. Not found - return match to keep it visible (easier to debug) or empty?
+                            // Let's keep it visible so they know it didn't work.
+                            return match;
+                        });
+                    }
                 }
 
                 await emailService.sendEmail({
