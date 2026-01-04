@@ -279,6 +279,33 @@ router.post('/verify-identity', async (req, res) => {
   }
 });
 
+router.post('/test-smtp', async (req, res) => {
+  try {
+    const config = req.body;
+
+    // Validate required fields
+    if (!config.host || !config.port || !config.user || !config.pass) {
+      return res.status(400).json({ error: 'Missing SMTP configuration fields' });
+    }
+
+    const isValid = await emailService.verifySMTP({
+      host: config.host,
+      port: Number(config.port),
+      user: config.user,
+      pass: config.pass
+    });
+
+    if (isValid) {
+      res.json({ message: 'SMTP Connection Successful' });
+    } else {
+      res.status(400).json({ error: 'Failed to verify SMTP connection' });
+    }
+  } catch (error: any) {
+    console.error('SMTP Test Error:', error);
+    res.status(400).json({ error: error.message || 'SMTP Connection Failed' });
+  }
+});
+
 router.post('/check-identity-status', async (req, res) => {
   try {
     const { email } = req.body;

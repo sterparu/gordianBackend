@@ -30,7 +30,7 @@ export class EmailService {
     private static instance: EmailService;
     private sharedSesClient: SESClient | null = null;
     private sharedSesTransporter: nodemailer.Transporter | null = null;
-    private baseUrl: string = process.env.BASE_URL || 'http://localhost:4000'; // Default to localhost
+    private baseUrl: string = process.env.BASE_URL || 'https://app.vasteris.com'; // Default to production URL
 
     private constructor() {
         // Initialize Shared SES if env vars are present
@@ -76,13 +76,47 @@ export class EmailService {
         // Inject Tracking Pixel & Unsubscribe Link if ID provided
         let emailHtml = payload.html;
         if (payload.trackingId) {
-            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-            const unsubscribeLink = `<br/><br/><p style="text-align:center; color:#9fa6b2; font-size:12px; font-family:sans-serif;">Don't want these emails? <a href="${frontendUrl}/unsubscribe?id=${payload.trackingId}" style="color:#9fa6b2; text-decoration:underline;">Unsubscribe</a></p>`;
+            const frontendUrl = process.env.FRONTEND_URL || 'https://app.vasteris.com';
 
-            const trackingPixel = `<img src="${this.baseUrl}/api/analytics/track/${payload.trackingId}" width="1" height="1" style="display:none;" alt="" />`;
+            // Extract Sender Name for footer
+            let senderName = 'Expeditorului';
+            if (payload.from) {
+                const match = payload.from.match(/^(.*)<.*>$/);
+                if (match) {
+                    senderName = match[1].trim().replace(/^["']|["']$/g, '');
+                } else if (!payload.from.includes('@')) {
+                    senderName = payload.from;
+                } else {
+                    senderName = payload.from; // Fallback to email if no name part
+                }
+            }
+
+            const unsubscribeLink = `
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+    <tr>
+        <td style="font-family: sans-serif; font-size: 12px; color: #4a5568;">
+            <strong>De ce am primit acest e-mail?</strong><br />
+            Primiți acest mesaj deoarece sunteți înregistrat în baza de date a <strong>${senderName}</strong> pentru comunicări financiare și facturare.
+            <br /><br />
+            <strong>Informații Expeditor:</strong><br />
+            weCodeTou SRL | CIF: 48187338 | Reg. Com: J23/9284/2023<br />
+            Adresă: Str. Padurea Craiului Nr. 78B, Sat Berceni, Jud. Ilfov, 077020<br />
+            Suport: <a href="mailto:support@vasteris.com" style="color: #4c51bf;">support@vasteris.com</a>
+        </td>
+    </tr>
+    <tr>
+        <td style="padding-top: 20px; font-family: sans-serif; font-size: 11px; color: #a0aec0; text-align: center;">
+            <a href="${frontendUrl}/unsubscribe?id=${payload.trackingId}" style="color: #a0aec0; text-decoration: underline;">Dezabonare</a> | 
+            <a href="https://vasteris.com/privacy" style="color: #a0aec0; text-decoration: underline;">Politică Confidențialitate</a>
+        </td>
+    </tr>
+</table>`;
+
+            // Tracking removed per user request
+            // const trackingPixel = `<img src="${this.baseUrl}/api/analytics/track/${payload.trackingId}" width="1" height="1" style="display:none;" alt="" />`;
 
             // Append to body end if exists, else append to end of string
-            const injection = `${unsubscribeLink}${trackingPixel}`;
+            const injection = `${unsubscribeLink}`; // Removed trackingPixel
 
             if (emailHtml.includes('</body>')) {
                 emailHtml = emailHtml.replace('</body>', `${injection}</body>`);
@@ -92,7 +126,18 @@ export class EmailService {
         }
 
         if (payload.provider === 'smtp' && payload.smtpConfig) {
-            transporter = nodemailer.createTransport(payload.smtpConfig);
+            transporter = nodemailer.createTransport({
+                ...payload.smtpConfig,
+                port: Number(payload.smtpConfig.port), // Ensure port is number
+                // Add timeouts to prevent hanging indefinitely (default is very long)
+                connectionTimeout: 10000, // 10 seconds
+                greetingTimeout: 10000,   // 10 seconds
+                socketTimeout: 20000,     // 20 seconds
+                // Improve compatibility with older/self-signed servers
+                tls: {
+                    rejectUnauthorized: false
+                }
+            });
         } else if (payload.provider === 'custom-ses' && payload.sesConfig) {
             const ses = new SESClient({
                 apiVersion: '2010-12-01',
@@ -113,14 +158,65 @@ export class EmailService {
             transporter = this.sharedSesTransporter;
         }
 
+        // Ensure HTML is wrapped in <html><body> tags
+        if (!emailHtml.includes('<html') && !emailHtml.includes('<body')) {
+            emailHtml = `
+<!DOCTYPE html>
+<html>
+<body style="font-family: sans-serif;">
+${emailHtml}
+</body>
+</html>`;
+        }
+
+        // Generate Plain Text version
+        const textContent = this.generatePlainText(emailHtml);
+
+        // Add headers (List-Unsubscribe)
+        const headers: any = {};
+        if (payload.trackingId) {
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+            const unsubscribeUrl = `${frontendUrl}/unsubscribe?id=${payload.trackingId}`;
+            headers['List-Unsubscribe'] = `<${unsubscribeUrl}>`;
+        }
+
+        // Fix for FREEMAIL_FORGED_REPLYTO strategy
+        // If Reply-To is a freemail (gmail, yahoo, etc) and From is likely custom, 
+        // using the freemail reply-to hurts spam score significantly (-2.5).
+        // Per user report: "scoate de tot câmpul Reply-To".
+        let finalReplyTo = payload.replyTo;
+        if (finalReplyTo && (finalReplyTo.includes('@gmail.com') || finalReplyTo.includes('@yahoo.com') || finalReplyTo.includes('@hotmail.com'))) {
+            // Check if From is NOT a freemail (simple check)
+            const fromEmail = typeof payload.from === 'string' ? payload.from : '';
+            if (fromEmail && !fromEmail.includes('@gmail.com') && !fromEmail.includes('@yahoo.com') && !fromEmail.includes('@hotmail.com')) {
+                // Mismatch detected: Custom Domain sending -> Freemail Reply-To. 
+                // Remove Reply-To to improve deliverability.
+                finalReplyTo = undefined;
+            }
+        }
+
         await transporter.sendMail({
             from: payload.from || process.env.DEFAULT_FROM_EMAIL || 'noreply@toolmail.com',
             to: recipientEmail,
             subject: payload.subject,
-            html: emailHtml, // Use injected HTML
-            replyTo: payload.replyTo,
-            attachments: nodemailerAttachments.length > 0 ? nodemailerAttachments : undefined
+            html: emailHtml, // HTML version
+            text: textContent, // Plain Text version (Multi-part)
+            replyTo: finalReplyTo,
+            attachments: nodemailerAttachments.length > 0 ? nodemailerAttachments : undefined,
+            headers: headers
         });
+    }
+
+    private generatePlainText(html: string): string {
+        return html
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove styles
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove scripts
+            .replace(/<br\s*\/?>/gi, '\n') // Replace <br> with newlines
+            .replace(/<\/p>/gi, '\n\n') // Paragraphs to double newlines
+            .replace(/<[^>]+>/g, '') // Strip remaining tags
+            .replace(/&nbsp;/g, ' ') // decode entities logic could be more robust but this covers basic
+            .replace(/\n\s+\n/g, '\n\n') // Collapse multiple newlines
+            .trim();
     }
 
     public validateConfiguration(options: any): void { // relaxed type to any to match usage in routes
@@ -160,6 +256,9 @@ export class EmailService {
                 user: config.user,
                 pass: config.pass,
             },
+            connectionTimeout: 10000,
+            greetingTimeout: 10000,
+            socketTimeout: 20000
         });
 
         try {
