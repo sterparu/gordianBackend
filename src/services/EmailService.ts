@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import * as aws from '@aws-sdk/client-ses';
 import { SESClient } from '@aws-sdk/client-ses';
 
+
 interface EmailPayload {
     to: string | { email: string; attachments?: { name: string; url: string }[] };
     subject: string;

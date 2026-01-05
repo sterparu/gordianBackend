@@ -68,17 +68,40 @@ export const emailWorker = new Worker('email-sending', async (job) => {
                 const rowData = typeof recipient === 'object' ? recipient.data : null;
 
                 if (rowData) {
-                    // Escape Regex Helper
-                    const escapeRegExp = (string: string) => {
-                        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    };
+                    if (rowData) {
+                        // Create a normalized lookup map
+                        // Strategy: 
+                        // 1. Remove diacritics (Număr -> Numar)
+                        // 2. Lowercase
+                        // 3. Remove non-alphanumeric (Numar Rata -> numarrata)
+                        const normalize = (k: string) => k.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, '');
 
-                    Object.keys(rowData).forEach(key => {
-                        // We match {{key}}
-                        const safeKey = escapeRegExp(key);
-                        const value = rowData[key] || '';
-                        personalizedHtml = personalizedHtml.replace(new RegExp(`{{${safeKey}}}`, 'g'), String(value));
-                    });
+                        const lookup = new Map();
+                        Object.keys(rowData).forEach(k => {
+                            // We store the original value against the normalized key
+                            const norm = normalize(k);
+                            lookup.set(norm, rowData[k]);
+                        });
+
+                        // Replace {{ Variable }} patterns
+                        personalizedHtml = personalizedHtml.replace(/\{\{([^{}]+)\}\}/g, (match: string, content: string) => {
+                            // 1. Decode HTML entities in the variable name (e.g. &nbsp; -> space)
+                            const decodedContent = content.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+
+                            // 2. Normalize
+                            const key = normalize(decodedContent);
+
+                            if (lookup.has(key)) {
+                                const val = lookup.get(key);
+                                // Handle Dates/Numbers specifically if needed? 
+                                // For now just String() but check if it's an object/date?
+                                return val !== undefined && val !== null ? String(val) : '';
+                            }
+
+                            // Keep match if not found, to help debugging
+                            return match;
+                        });
+                    }
                 }
 
                 await emailService.sendEmail({
