@@ -75,9 +75,9 @@ export class EmailService {
             path: att.url
         }));
 
-        // Inject Tracking Pixel & Unsubscribe Link if ID provided
+        // Inject Tracking Pixel & Unsubscribe Link if ID provided AND NOT SMTP
         let emailHtml = payload.html;
-        if (payload.trackingId) {
+        if (payload.trackingId && payload.provider !== 'smtp') {
             const frontendUrl = process.env.FRONTEND_URL || 'https://app.vasteris.com';
 
             // Extract Sender Name for footer
