@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { supabase } from '../db/supabase';
+import { encrypt, decrypt } from '../utils/encryption';
 
 const router = Router();
 
@@ -26,6 +27,11 @@ router.get('/', async (req, res) => {
             from_email: 'notification@vasteris.com',
             from_name: 'ToolMail User'
         };
+
+        // Decrypt password if it exists
+        if (settings.smtp_pass) {
+            settings.smtp_pass = decrypt(settings.smtp_pass);
+        }
 
         res.json(settings);
     } catch (error: any) {
@@ -75,6 +81,7 @@ router.put('/', async (req, res) => {
             .upsert({
                 id: req.user.id,
                 ...payload,
+                smtp_pass: payload.smtp_pass ? encrypt(payload.smtp_pass) : payload.smtp_pass,
                 updated_at: new Date()
             })
             .select()

@@ -70,9 +70,13 @@ router.post('/portal', requireAuth, async (req, res) => {
         }
 
         // 2. Create Portal Session
+        const frontendUrl = (process.env.FRONTEND_URL && !process.env.FRONTEND_URL.includes('localhost'))
+            ? process.env.FRONTEND_URL
+            : 'http://localhost:5173';
+
         const session = await stripe.billingPortal.sessions.create({
             customer: user.stripe_customer_id,
-            return_url: req.body.returnUrl || 'http://localhost:5173/billing', // Default to billing page
+            return_url: req.body.returnUrl || `${frontendUrl}/billing`,
         });
 
         res.json({ url: session.url });

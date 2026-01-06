@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import { EmailService } from '../services/EmailService';
 import { emailQueue } from '../queues/emailQueue';
+import { decrypt } from '../utils/encryption';
 
 const router = Router();
 const emailService = EmailService.getInstance();
@@ -19,6 +20,12 @@ const getEmailSettings = async (userId: string) => {
   if (error || !data) {
     throw new Error('Email configuration not found. Please ensure you are logged in and settings are created.');
   }
+
+  // Decrypt SMTP password for usage
+  if (data.smtp_pass) {
+    data.smtp_pass = decrypt(data.smtp_pass);
+  }
+
   return data;
 };
 
