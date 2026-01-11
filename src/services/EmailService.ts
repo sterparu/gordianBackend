@@ -235,7 +235,7 @@ export class EmailService {
         br { 
             display: block; 
             content: ""; 
-            margin: 0 0 10px 0; 
+            margin: 0; 
             padding: 0; 
             line-height: 1.5;
         }
@@ -257,7 +257,7 @@ ${emailHtml}
         br { 
             display: block; 
             content: ""; 
-            margin: 0 0 10px 0; 
+            margin: 0; 
             padding: 0; 
             line-height: 1.5;
         }

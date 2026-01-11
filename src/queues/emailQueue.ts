@@ -57,23 +57,28 @@ export const emailWorker = new Worker('email-sending', async (job) => {
             }
         };
 
-        // Normalize HTML to preserve multiple line breaks by converting empty paragraphs to <br> tags
+        // Normalize HTML to preserve multiple line breaks by converting empty paragraphs to <p><br></p> tags
         const normalizeHtmlLineBreaks = (html: string): string => {
             if (!html) return html;
             
-            // Convert consecutive empty paragraphs (<p></p> or <p><br></p>) to <br> tags
+            // Convert consecutive empty paragraphs (<p></p> or <p><br></p>) to <p><br></p> tags
+            // Using <p><br></p> ensures each break has proper spacing via paragraph margin
             let normalized = html;
             
-            // First, handle paragraphs with only <br> inside: <p><br></p> or <p><br/></p> -> <p></p>
-            normalized = normalized.replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, '<p></p>');
+            // First, normalize paragraphs with only <br> inside: <p><br></p> or <p><br/></p> -> <p><br></p>
+            normalized = normalized.replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, '<p><br></p>');
             
-            // Convert consecutive empty paragraphs to <br> tags
-            // Match sequences of <p></p> (with optional whitespace/newlines between them)
-            normalized = normalized.replace(/(<p><\/p>[\s\n]*)+/gi, (match) => {
-                // Count all empty paragraphs in the match (including those separated by whitespace)
-                const count = (match.match(/<p><\/p>/gi) || []).length;
-                // Replace with that many <br> tags
-                return '<br>'.repeat(count);
+            // Convert consecutive empty paragraphs to <p><br></p> tags
+            // More robust: replace each empty paragraph individually, then group consecutive ones
+            // Step 1: Replace each empty paragraph with a placeholder
+            normalized = normalized.replace(/<p><\/p>/gi, '___EMPTY_P___');
+            
+            // Step 2: Replace consecutive placeholders with <p><br></p> tags
+            normalized = normalized.replace(/(___EMPTY_P___[\s\n]*)+/gi, (match) => {
+                // Count how many placeholders we have
+                const count = (match.match(/___EMPTY_P___/g) || []).length;
+                // Replace with that many <p><br></p> tags to ensure proper spacing
+                return '<p><br></p>'.repeat(count);
             });
             
             return normalized;
