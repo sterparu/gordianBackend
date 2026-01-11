@@ -170,11 +170,13 @@ export class EmailService {
 </table>`;
 
             // Append to body end if exists, else append to end of string
+            // Preserve any trailing whitespace/newlines before injecting footer
             const injection = `${unsubscribeLink}`;
 
             if (emailHtml.includes('</body>')) {
                 emailHtml = emailHtml.replace('</body>', `${injection}</body>`);
             } else {
+                // Preserve trailing structure - append with proper spacing
                 emailHtml += injection;
             }
         }
@@ -229,6 +231,14 @@ export class EmailService {
     <style>
         body { font-family: Arial, Helvetica, sans-serif; line-height: 1.5; color: #333333; }
         p { margin: 0 0 10px 0; padding: 0; }
+        p:empty { margin-bottom: 10px; }
+        br { 
+            display: block; 
+            content: ""; 
+            margin: 0; 
+            padding: 0; 
+            line-height: 1.5;
+        }
         img { max-width: 100%; height: auto; }
         h1, h2, h3 { margin: 20px 0 10px 0; line-height: 1.2; }
     </style>
@@ -243,6 +253,14 @@ ${emailHtml}
     <style>
         body { font-family: Arial, Helvetica, sans-serif; line-height: 1.5; color: #333333; }
         p { margin: 0 0 10px 0; padding: 0; }
+        p:empty { margin-bottom: 10px; }
+        br { 
+            display: block; 
+            content: ""; 
+            margin: 0; 
+            padding: 0; 
+            line-height: 1.5;
+        }
         img { max-width: 100%; height: auto; }
         h1, h2, h3 { margin: 20px 0 10px 0; line-height: 1.2; }
     </style>`;

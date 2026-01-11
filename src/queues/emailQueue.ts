@@ -57,14 +57,41 @@ export const emailWorker = new Worker('email-sending', async (job) => {
             }
         };
 
+        // Normalize HTML to preserve multiple line breaks by converting empty paragraphs to <p><br></p> tags
+        const normalizeHtmlLineBreaks = (html: string): string => {
+            if (!html) return html;
+            
+            // Convert consecutive empty paragraphs (<p></p> or <p><br></p>) to <p><br></p> tags
+            // Using <p><br></p> ensures each break has proper spacing via paragraph margin
+            let normalized = html;
+            
+            // First, normalize paragraphs with only <br> inside: <p><br></p> or <p><br/></p> -> <p><br></p>
+            normalized = normalized.replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, '<p><br></p>');
+            
+            // Convert consecutive empty paragraphs to <p><br></p> tags
+            // More robust: replace each empty paragraph individually, then group consecutive ones
+            // Step 1: Replace each empty paragraph with a placeholder
+            normalized = normalized.replace(/<p><\/p>/gi, '___EMPTY_P___');
+            
+            // Step 2: Replace consecutive placeholders with <p><br></p> tags
+            normalized = normalized.replace(/(___EMPTY_P___[\s\n]*)+/gi, (match) => {
+                // Count how many placeholders we have
+                const count = (match.match(/___EMPTY_P___/g) || []).length;
+                // Replace with that many <p><br></p> tags to ensure proper spacing
+                return '<p><br></p>'.repeat(count);
+            });
+            
+            return normalized;
+        };
+
         const processRecipient = async (recipient: any) => {
             const emailAddress = typeof recipient === 'string' ? recipient : recipient.email;
             // Extract trackingId if it exists
             const trackingId = typeof recipient === 'object' ? recipient.trackingId : undefined;
 
             try {
-                // Perform Variable Substitution
-                let personalizedHtml = html;
+                // Normalize HTML first to preserve line breaks, then perform Variable Substitution
+                let personalizedHtml = normalizeHtmlLineBreaks(html);
                 const rowData = typeof recipient === 'object' ? recipient.data : null;
 
                 if (rowData) {
