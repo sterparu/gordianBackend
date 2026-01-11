@@ -95,7 +95,7 @@ export const emailWorker = new Worker('email-sending', async (job) => {
                                 const val = lookup.get(key);
                                 // Handle Dates/Numbers specifically if needed? 
                                 // For now just String() but check if it's an object/date?
-                                return val !== undefined && val !== null ? String(val) : '';
+                                return val !== undefined && val !== null ? String(val).replace(/\n/g, '<br>') : '';
                             }
 
                             // Keep match if not found, to help debugging
