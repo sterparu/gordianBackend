@@ -220,25 +220,38 @@ export class EmailService {
             transporter = this.sharedSesTransporter;
         }
 
-        // Ensure HTML is wrapped in <html><body> tags and has Charset
         if (!emailHtml.includes('<html') && !emailHtml.includes('<body')) {
             emailHtml = `
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, Helvetica, sans-serif; line-height: 1.5; color: #333333; }
+        p { margin: 0 0 10px 0; padding: 0; }
+        img { max-width: 100%; height: auto; }
+        h1, h2, h3 { margin: 20px 0 10px 0; line-height: 1.2; }
+    </style>
 </head>
-<body style="font-family: sans-serif;">
+<body style="font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 0;">
 ${emailHtml}
 </body>
 </html>`;
         } else if (!emailHtml.includes('<meta charset="UTF-8">') && !emailHtml.includes("<meta charset='UTF-8'>")) {
-            // Inject charset if missing in existing HTML
-            emailHtml = emailHtml.replace('<head>', '<head>\n<meta charset="UTF-8">');
-            if (!emailHtml.includes('<head>')) {
-                // No head, add it inside html or just prepend to body? 
-                // Safest is to just hope nodemailer handles it or wrap it, but strict injection:
-                emailHtml = emailHtml.replace('<html>', '<html><head><meta charset="UTF-8"></head>');
+            // Inject charset AND styles if missing in existing HTML
+            const styleBlock = `
+    <style>
+        body { font-family: Arial, Helvetica, sans-serif; line-height: 1.5; color: #333333; }
+        p { margin: 0 0 10px 0; padding: 0; }
+        img { max-width: 100%; height: auto; }
+        h1, h2, h3 { margin: 20px 0 10px 0; line-height: 1.2; }
+    </style>`;
+
+            if (emailHtml.includes('<head>')) {
+                emailHtml = emailHtml.replace('<head>', `<head>\n<meta charset="UTF-8">${styleBlock}`);
+            } else {
+                // If it has html but no head, inject head
+                emailHtml = emailHtml.replace('<html>', `<html><head><meta charset="UTF-8">${styleBlock}</head>`);
             }
         }
 
