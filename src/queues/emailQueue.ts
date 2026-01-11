@@ -57,14 +57,36 @@ export const emailWorker = new Worker('email-sending', async (job) => {
             }
         };
 
+        // Normalize HTML to preserve multiple line breaks by converting empty paragraphs to <br> tags
+        const normalizeHtmlLineBreaks = (html: string): string => {
+            if (!html) return html;
+            
+            // Convert consecutive empty paragraphs (<p></p> or <p><br></p>) to <br> tags
+            let normalized = html;
+            
+            // First, handle paragraphs with only <br> inside: <p><br></p> or <p><br/></p> -> <p></p>
+            normalized = normalized.replace(/<p>\s*<br\s*\/?>\s*<\/p>/gi, '<p></p>');
+            
+            // Convert consecutive empty paragraphs to <br> tags
+            // Match sequences of <p></p> (with optional whitespace/newlines between them)
+            normalized = normalized.replace(/(<p><\/p>[\s\n]*)+/gi, (match) => {
+                // Count all empty paragraphs in the match (including those separated by whitespace)
+                const count = (match.match(/<p><\/p>/gi) || []).length;
+                // Replace with that many <br> tags
+                return '<br>'.repeat(count);
+            });
+            
+            return normalized;
+        };
+
         const processRecipient = async (recipient: any) => {
             const emailAddress = typeof recipient === 'string' ? recipient : recipient.email;
             // Extract trackingId if it exists
             const trackingId = typeof recipient === 'object' ? recipient.trackingId : undefined;
 
             try {
-                // Perform Variable Substitution
-                let personalizedHtml = html;
+                // Normalize HTML first to preserve line breaks, then perform Variable Substitution
+                let personalizedHtml = normalizeHtmlLineBreaks(html);
                 const rowData = typeof recipient === 'object' ? recipient.data : null;
 
                 if (rowData) {

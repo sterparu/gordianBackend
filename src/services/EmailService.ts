@@ -232,7 +232,7 @@ export class EmailService {
         body { font-family: Arial, Helvetica, sans-serif; line-height: 1.5; color: #333333; }
         p { margin: 0 0 10px 0; padding: 0; }
         p:empty { margin-bottom: 10px; }
-        br { line-height: 1.5; }
+        br { line-height: 1.5; display: block; margin: 0; padding: 0; }
         img { max-width: 100%; height: auto; }
         h1, h2, h3 { margin: 20px 0 10px 0; line-height: 1.2; }
     </style>
@@ -248,7 +248,7 @@ ${emailHtml}
         body { font-family: Arial, Helvetica, sans-serif; line-height: 1.5; color: #333333; }
         p { margin: 0 0 10px 0; padding: 0; }
         p:empty { margin-bottom: 10px; }
-        br { line-height: 1.5; }
+        br { line-height: 1.5; display: block; margin: 0; padding: 0; }
         img { max-width: 100%; height: auto; }
         h1, h2, h3 { margin: 20px 0 10px 0; line-height: 1.2; }
     </style>`;
